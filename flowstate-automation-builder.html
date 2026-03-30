@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLOWSTATE — Automation Workflow Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600;700;800;900&family=IBM+Plex+Mono:wght@300;400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#08090e;--bg1:#0e1017;--bg2:#141620;--bg3:#1a1d2e;--bg4:#22263a;
+--acc:#6c5ce7;--acc2:#a29bfe;--cyan:#00cec9;--teal:#55efc4;--pink:#fd79a8;
+--orange:#e17055;--yellow:#ffeaa7;--red:#d63031;--blue:#0984e3;
+--t1:#e8eaf0;--t2:#9ba0b4;--t3:#5a5f7a;
+--fd:'Syne',sans-serif;--fb:'Outfit',sans-serif;--fm:'IBM Plex Mono',monospace;
+--node-trigger:#6c5ce7;--node-action:#00cec9;--node-condition:#fd79a8;
+--node-delay:#e17055;--node-output:#55efc4;--node-loop:#a29bfe;
+--shadow:0 4px 24px rgba(0,0,0,0.4);
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--t1);font-family:var(--fb)}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--acc);border-radius:3px}
+
+/* === LAYOUT === */
+.app{display:grid;grid-template-rows:48px 1fr;grid-template-columns:260px 1fr 300px;height:100vh}
+.topbar{grid-column:1/-1;background:var(--bg1);border-bottom:1px solid rgba(108,92,231,0.15);display:flex;align-items:center;padding:0 1rem;gap:1rem;z-index:100}
+.sidebar{background:var(--bg1);border-right:1px solid rgba(108,92,231,0.1);overflow-y:auto;padding:0}
+.canvas-area{position:relative;overflow:hidden;background:var(--bg);cursor:grab}
+.canvas-area.grabbing{cursor:grabbing}
+.props-panel{background:var(--bg1);border-left:1px solid rgba(108,92,231,0.1);overflow-y:auto;padding:0}
+
+/* === TOPBAR === */
+.logo{font-family:var(--fd);font-weight:800;font-size:1rem;letter-spacing:0.06em}
+.logo em{font-style:normal;color:var(--acc)}
+.logo span{color:var(--cyan);font-weight:400}
+.tb-sep{width:1px;height:20px;background:rgba(108,92,231,0.2)}
+.tb-group{display:flex;gap:0.35rem;align-items:center}
+.tb-btn{padding:0.3rem 0.7rem;font-family:var(--fm);font-size:0.65rem;font-weight:500;letter-spacing:0.06em;border:1px solid rgba(108,92,231,0.25);border-radius:4px;background:transparent;color:var(--t2);cursor:pointer;transition:all 0.2s;text-transform:uppercase}
+.tb-btn:hover{border-color:var(--acc);color:var(--acc);background:rgba(108,92,231,0.08)}
+.tb-btn.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+.tb-btn.primary:hover{background:#7d6ff0;box-shadow:0 0 16px rgba(108,92,231,0.4)}
+.tb-btn.danger{border-color:rgba(214,48,49,0.3);color:var(--red)}.tb-btn.danger:hover{background:rgba(214,48,49,0.1)}
+.tb-info{font-family:var(--fm);font-size:0.6rem;color:var(--t3);margin-left:auto;display:flex;gap:1rem}
+.tb-info span{display:flex;align-items:center;gap:0.3rem}
+
+/* === SIDEBAR === */
+.sb-section{border-bottom:1px solid rgba(108,92,231,0.08);padding:0.75rem}
+.sb-title{font-family:var(--fd);font-size:0.6rem;font-weight:700;letter-spacing:0.16em;color:var(--t3);text-transform:uppercase;margin-bottom:0.6rem}
+.node-palette{display:flex;flex-direction:column;gap:0.35rem}
+.palette-item{display:flex;align-items:center;gap:0.6rem;padding:0.5rem 0.65rem;background:var(--bg2);border:1px solid rgba(108,92,231,0.08);border-radius:5px;cursor:grab;transition:all 0.2s;user-select:none}
+.palette-item:hover{border-color:var(--acc);background:var(--bg3);transform:translateX(3px)}
+.palette-item:active{cursor:grabbing}
+.pi-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0}
+.pi-info{flex:1;min-width:0}
+.pi-name{font-size:0.75rem;font-weight:600;color:var(--t1)}
+.pi-desc{font-size:0.55rem;color:var(--t3);margin-top:0.1rem}
+.pi-trigger .pi-icon{background:rgba(108,92,231,0.15);border:1px solid rgba(108,92,231,0.3)}
+.pi-action .pi-icon{background:rgba(0,206,201,0.12);border:1px solid rgba(0,206,201,0.3)}
+.pi-condition .pi-icon{background:rgba(253,121,168,0.12);border:1px solid rgba(253,121,168,0.3)}
+.pi-delay .pi-icon{background:rgba(225,112,85,0.12);border:1px solid rgba(225,112,85,0.3)}
+.pi-output .pi-icon{background:rgba(85,239,196,0.12);border:1px solid rgba(85,239,196,0.3)}
+.pi-loop .pi-icon{background:rgba(162,155,254,0.12);border:1px solid rgba(162,155,254,0.3)}
+
+/* Template cards */
+.template-card{background:var(--bg2);border:1px solid rgba(108,92,231,0.1);border-radius:5px;padding:0.6rem;margin-bottom:0.4rem;cursor:pointer;transition:all 0.2s}
+.template-card:hover{border-color:var(--acc);background:var(--bg3)}
+.template-card h4{font-size:0.7rem;font-weight:600;color:var(--t1);margin-bottom:0.2rem}
+.template-card p{font-size:0.55rem;color:var(--t3);line-height:1.4}
+.template-card .tc-tag{display:inline-block;font-size:0.45rem;padding:0.1rem 0.35rem;background:rgba(108,92,231,0.1);border:1px solid rgba(108,92,231,0.2);border-radius:2px;color:var(--acc2);margin-top:0.3rem;margin-right:0.2rem}
+
+/* === CANVAS === */
+#flowCanvas{position:absolute;top:0;left:0}
+.flow-node{position:absolute;min-width:180px;background:var(--bg2);border:2px solid var(--bg4);border-radius:8px;box-shadow:var(--shadow);cursor:move;user-select:none;transition:box-shadow 0.2s,border-color 0.2s;z-index:10}
+.flow-node:hover{z-index:20}
+.flow-node.selected{border-color:var(--acc);box-shadow:0 0 0 2px rgba(108,92,231,0.25),var(--shadow)}
+.flow-node.dragging{opacity:0.9;z-index:100}
+.fn-header{padding:0.45rem 0.65rem;border-radius:6px 6px 0 0;display:flex;align-items:center;gap:0.45rem;cursor:move}
+.fn-icon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:0.7rem}
+.fn-title{font-size:0.7rem;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fn-delete{width:18px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:0.6rem;cursor:pointer;color:var(--t3);transition:all 0.2s;background:transparent;border:none}
+.fn-delete:hover{color:var(--red);background:rgba(214,48,49,0.15)}
+.fn-body{padding:0.5rem 0.65rem;font-size:0.6rem;color:var(--t2);border-top:1px solid rgba(255,255,255,0.04)}
+.fn-config{font-family:var(--fm);font-size:0.55rem;color:var(--t3);line-height:1.5}
+.fn-port{position:absolute;width:12px;height:12px;border-radius:50%;border:2px solid;cursor:crosshair;z-index:15;transition:transform 0.15s,box-shadow 0.15s}
+.fn-port:hover{transform:scale(1.4);box-shadow:0 0 8px currentColor}
+.fn-port.port-in{left:-6px;top:50%;transform:translateY(-50%)}
+.fn-port.port-in:hover{transform:translateY(-50%) scale(1.4)}
+.fn-port.port-out{right:-6px;top:50%;transform:translateY(-50%)}
+.fn-port.port-out:hover{transform:translateY(-50%) scale(1.4)}
+.fn-port.port-yes{right:-6px;top:35%;transform:translateY(-50%);border-color:var(--teal);background:var(--bg2)}
+.fn-port.port-no{right:-6px;top:65%;transform:translateY(-50%);border-color:var(--pink);background:var(--bg2)}
+.port-label{position:absolute;font-size:0.45rem;font-family:var(--fm);white-space:nowrap;pointer-events:none;letter-spacing:0.05em}
+.port-label.label-yes{right:16px;top:35%;transform:translateY(-50%);color:var(--teal)}
+.port-label.label-no{right:16px;top:65%;transform:translateY(-50%);color:var(--pink)}
+
+/* Node type colors */
+.fn-trigger .fn-header{background:rgba(108,92,231,0.12)}.fn-trigger{border-color:rgba(108,92,231,0.3)}
+.fn-trigger .fn-icon{background:rgba(108,92,231,0.2)}.fn-trigger .fn-port{border-color:var(--acc);background:var(--bg2)}
+.fn-action .fn-header{background:rgba(0,206,201,0.1)}.fn-action{border-color:rgba(0,206,201,0.25)}
+.fn-action .fn-icon{background:rgba(0,206,201,0.2)}.fn-action .fn-port{border-color:var(--cyan);background:var(--bg2)}
+.fn-condition .fn-header{background:rgba(253,121,168,0.1)}.fn-condition{border-color:rgba(253,121,168,0.25)}
+.fn-condition .fn-icon{background:rgba(253,121,168,0.2)}.fn-condition .fn-port{border-color:var(--pink);background:var(--bg2)}
+.fn-delay .fn-header{background:rgba(225,112,85,0.1)}.fn-delay{border-color:rgba(225,112,85,0.25)}
+.fn-delay .fn-icon{background:rgba(225,112,85,0.2)}.fn-delay .fn-port{border-color:var(--orange);background:var(--bg2)}
+.fn-output .fn-header{background:rgba(85,239,196,0.1)}.fn-output{border-color:rgba(85,239,196,0.25)}
+.fn-output .fn-icon{background:rgba(85,239,196,0.2)}.fn-output .fn-port{border-color:var(--teal);background:var(--bg2)}
+.fn-loop .fn-header{background:rgba(162,155,254,0.1)}.fn-loop{border-color:rgba(162,155,254,0.25)}
+.fn-loop .fn-icon{background:rgba(162,155,254,0.2)}.fn-loop .fn-port{border-color:var(--acc2);background:var(--bg2)}
+
+/* === PROPERTIES PANEL === */
+.pp-section{padding:0.75rem;border-bottom:1px solid rgba(108,92,231,0.08)}
+.pp-title{font-family:var(--fd);font-size:0.6rem;font-weight:700;letter-spacing:0.16em;color:var(--t3);text-transform:uppercase;margin-bottom:0.6rem}
+.pp-field{margin-bottom:0.6rem}
+.pp-label{font-size:0.6rem;font-weight:500;color:var(--t3);margin-bottom:0.25rem;display:block;letter-spacing:0.04em}
+.pp-input{width:100%;padding:0.4rem 0.55rem;background:var(--bg);border:1px solid rgba(108,92,231,0.15);color:var(--t1);font-family:var(--fm);font-size:0.7rem;border-radius:4px;outline:none;transition:border-color 0.2s}
+.pp-input:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(108,92,231,0.1)}
+.pp-select{width:100%;padding:0.4rem 0.55rem;background:var(--bg);border:1px solid rgba(108,92,231,0.15);color:var(--t1);font-family:var(--fm);font-size:0.7rem;border-radius:4px;outline:none;cursor:pointer}
+.pp-textarea{width:100%;min-height:60px;padding:0.4rem 0.55rem;background:var(--bg);border:1px solid rgba(108,92,231,0.15);color:var(--t1);font-family:var(--fm);font-size:0.65rem;border-radius:4px;outline:none;resize:vertical;line-height:1.5}
+.pp-textarea:focus,.pp-select:focus{border-color:var(--acc)}
+.pp-empty{text-align:center;padding:3rem 1rem;color:var(--t3);font-size:0.7rem}
+.pp-badge{display:inline-block;padding:0.15rem 0.5rem;font-size:0.55rem;font-weight:600;border-radius:3px;letter-spacing:0.06em}
+
+/* Stats panel */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.4rem}
+.stat-card{background:var(--bg);border:1px solid rgba(108,92,231,0.1);border-radius:5px;padding:0.5rem;text-align:center}
+.stat-val{font-family:var(--fd);font-size:1.1rem;font-weight:700}
+.stat-lbl{font-size:0.5rem;color:var(--t3);letter-spacing:0.1em;text-transform:uppercase;margin-top:0.15rem}
+
+/* Minimap */
+#minimap{width:100%;height:120px;background:var(--bg);border:1px solid rgba(108,92,231,0.12);border-radius:5px;position:relative;overflow:hidden;cursor:pointer}
+.mm-node{position:absolute;border-radius:2px;opacity:0.7}
+.mm-viewport{position:absolute;border:1px solid var(--acc);border-radius:2px;opacity:0.4}
+
+/* Zoom controls */
+.zoom-controls{position:absolute;bottom:1rem;right:1rem;display:flex;gap:0.25rem;z-index:50}
+.zoom-btn{width:32px;height:32px;border-radius:6px;background:var(--bg1);border:1px solid rgba(108,92,231,0.2);color:var(--t2);font-size:0.85rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s}
+.zoom-btn:hover{border-color:var(--acc);color:var(--acc);background:var(--bg2)}
+.zoom-label{font-family:var(--fm);font-size:0.6rem;color:var(--t3);display:flex;align-items:center;padding:0 0.5rem}
+
+/* Grid hint */
+.canvas-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:5;opacity:0.3;transition:opacity 0.5s}
+.canvas-hint.hidden{opacity:0}
+.canvas-hint h2{font-family:var(--fd);font-size:1.2rem;font-weight:700;color:var(--t3);letter-spacing:0.08em;margin-bottom:0.4rem}
+.canvas-hint p{font-size:0.7rem;color:var(--t3)}
+
+/* Export modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg1);border:1px solid rgba(108,92,231,0.2);border-radius:8px;width:90vw;max-width:700px;max-height:80vh;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.modal-head{padding:0.75rem 1rem;border-bottom:1px solid rgba(108,92,231,0.12);display:flex;justify-content:space-between;align-items:center}
+.modal-head h3{font-family:var(--fd);font-size:0.75rem;letter-spacing:0.12em;color:var(--acc)}
+.modal-close{background:none;border:1px solid rgba(108,92,231,0.2);color:var(--t3);width:28px;height:28px;border-radius:4px;cursor:pointer;font-size:0.8rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.modal-close:hover{color:var(--red);border-color:var(--red)}
+.modal-body{padding:1rem;overflow-y:auto;max-height:calc(80vh - 50px)}
+.modal-body pre{background:var(--bg);border:1px solid rgba(108,92,231,0.1);border-radius:5px;padding:1rem;font-family:var(--fm);font-size:0.65rem;line-height:1.6;color:var(--t2);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+.modal-body .export-tabs{display:flex;gap:0.25rem;margin-bottom:0.75rem}
+.export-tab{padding:0.3rem 0.75rem;font-size:0.65rem;font-weight:600;border:1px solid rgba(108,92,231,0.15);border-radius:4px;background:transparent;color:var(--t3);cursor:pointer;transition:all 0.2s}
+.export-tab.active{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+/* Responsive */
+@media(max-width:900px){.app{grid-template-columns:1fr}.sidebar,.props-panel{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="logo"><em>FLOW</em><span>STATE</span></div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <button class="tb-btn" onclick="undo()" title="Undo">↩ Undo</button>
+      <button class="tb-btn" onclick="redo()" title="Redo">↪ Redo</button>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <button class="tb-btn" onclick="autoLayout()">Auto Layout</button>
+      <button class="tb-btn" onclick="validateFlow()">✓ Validate</button>
+      <button class="tb-btn primary" onclick="openExport()">Export</button>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-group">
+      <button class="tb-btn" onclick="saveFlow()">Save</button>
+      <button class="tb-btn" onclick="loadFlow()">Load</button>
+      <button class="tb-btn danger" onclick="clearCanvas()">Clear</button>
+    </div>
+    <div class="tb-info">
+      <span id="nodeCount">Nodes: 0</span>
+      <span id="connCount">Connections: 0</span>
+      <span id="zoomLevel">100%</span>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-section">
+      <div class="sb-title">Node Palette</div>
+      <div class="node-palette">
+        <div class="palette-item pi-trigger" draggable="true" data-type="trigger" data-subtype="schedule">
+          <div class="pi-icon">⏰</div>
+          <div class="pi-info"><div class="pi-name">Schedule Trigger</div><div class="pi-desc">Time-based automation start</div></div>
+        </div>
+        <div class="palette-item pi-trigger" draggable="true" data-type="trigger" data-subtype="webhook">
+          <div class="pi-icon">🔗</div>
+          <div class="pi-info"><div class="pi-name">Webhook Trigger</div><div class="pi-desc">HTTP request initiator</div></div>
+        </div>
+        <div class="palette-item pi-trigger" draggable="true" data-type="trigger" data-subtype="event">
+          <div class="pi-icon">⚡</div>
+          <div class="pi-info"><div class="pi-name">Event Trigger</div><div class="pi-desc">System event listener</div></div>
+        </div>
+        <div class="palette-item pi-trigger" draggable="true" data-type="trigger" data-subtype="manual">
+          <div class="pi-icon">👤</div>
+          <div class="pi-info"><div class="pi-name">Manual Trigger</div><div class="pi-desc">User-initiated start</div></div>
+        </div>
+        <div class="palette-item pi-action" draggable="true" data-type="action" data-subtype="http">
+          <div class="pi-icon">🌐</div>
+          <div class="pi-info"><div class="pi-name">HTTP Request</div><div class="pi-desc">Call external API</div></div>
+        </div>
+        <div class="palette-item pi-action" draggable="true" data-type="action" data-subtype="email">
+          <div class="pi-icon">📧</div>
+          <div class="pi-info"><div class="pi-name">Send Email</div><div class="pi-desc">SMTP / Graph API</div></div>
+        </div>
+        <div class="palette-item pi-action" draggable="true" data-type="action" data-subtype="teams">
+          <div class="pi-icon">💬</div>
+          <div class="pi-info"><div class="pi-name">Teams Message</div><div class="pi-desc">Post to channel/chat</div></div>
+        </div>
+        <div class="palette-item pi-action" draggable="true" data-type="action" data-subtype="database">
+          <div class="pi-icon">🗄️</div>
+          <div class="pi-info"><div class="pi-name">Database Query</div><div class="pi-desc">SQL / NoSQL operation</div></div>
+        </div>
+        <div class="palette-item pi-action" draggable="true" data-type="action" data-subtype="transform">
+          <div class="pi-icon">🔄</div>
+          <div class="pi-info"><div class="pi-name">Transform Data</div><div class="pi-desc">Map, filter, reshape</div></div>
+        </div>
+        <div class="palette-item pi-action" draggable="true" data-type="action" data-subtype="script">
+          <div class="pi-icon">📜</div>
+          <div class="pi-info"><div class="pi-name">Run Script</div><div class="pi-desc">Python / PowerShell / JS</div></div>
+        </div>
+        <div class="palette-item pi-condition" draggable="true" data-type="condition" data-subtype="if">
+          <div class="pi-icon">🔀</div>
+          <div class="pi-info"><div class="pi-name">If / Else</div><div class="pi-desc">Conditional branching</div></div>
+        </div>
+        <div class="palette-item pi-condition" draggable="true" data-type="condition" data-subtype="switch">
+          <div class="pi-icon">🔃</div>
+          <div class="pi-info"><div class="pi-name">Switch</div><div class="pi-desc">Multi-path routing</div></div>
+        </div>
+        <div class="palette-item pi-delay" draggable="true" data-type="delay" data-subtype="wait">
+          <div class="pi-icon">⏳</div>
+          <div class="pi-info"><div class="pi-name">Delay / Wait</div><div class="pi-desc">Pause execution</div></div>
+        </div>
+        <div class="palette-item pi-loop" draggable="true" data-type="loop" data-subtype="foreach">
+          <div class="pi-icon">🔁</div>
+          <div class="pi-info"><div class="pi-name">For Each</div><div class="pi-desc">Iterate over collection</div></div>
+        </div>
+        <div class="palette-item pi-output" draggable="true" data-type="output" data-subtype="log">
+          <div class="pi-icon">📋</div>
+          <div class="pi-info"><div class="pi-name">Log Output</div><div class="pi-desc">Write to log / console</div></div>
+        </div>
+        <div class="palette-item pi-output" draggable="true" data-type="output" data-subtype="file">
+          <div class="pi-icon">💾</div>
+          <div class="pi-info"><div class="pi-name">Write File</div><div class="pi-desc">Save to disk / blob</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">Templates</div>
+      <div class="template-card" onclick="loadTemplate('onboarding')">
+        <h4>Employee Onboarding</h4>
+        <p>Create account → Send welcome email → Add to Teams → Notify manager</p>
+        <span class="tc-tag">M365</span><span class="tc-tag">Graph API</span>
+      </div>
+      <div class="template-card" onclick="loadTemplate('alerting')">
+        <h4>Security Alert Pipeline</h4>
+        <p>Webhook trigger → Check severity → Route to Teams/Email → Log incident</p>
+        <span class="tc-tag">SIEM</span><span class="tc-tag">IR</span>
+      </div>
+      <div class="template-card" onclick="loadTemplate('backup')">
+        <h4>Backup Verification</h4>
+        <p>Schedule → Check backup status → If failed → Alert + retry → Log result</p>
+        <span class="tc-tag">Ops</span><span class="tc-tag">Monitoring</span>
+      </div>
+      <div class="template-card" onclick="loadTemplate('ticketing')">
+        <h4>Helpdesk Ticket Flow</h4>
+        <p>Form submit → Categorize → Assign → Notify → Track SLA</p>
+        <span class="tc-tag">ITSM</span><span class="tc-tag">Automation</span>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-title">Minimap</div>
+      <div id="minimap"></div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area" id="canvasArea">
+    <canvas id="flowCanvas"></canvas>
+    <div id="nodesContainer"></div>
+    <div class="canvas-hint" id="canvasHint">
+      <h2>FLOWSTATE</h2>
+      <p>Drag nodes from the palette or load a template to begin</p>
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" onclick="zoomIn()">+</button>
+      <div class="zoom-label" id="zoomLabel">100%</div>
+      <button class="zoom-btn" onclick="zoomOut()">−</button>
+      <button class="zoom-btn" onclick="zoomReset()" style="font-size:0.6rem">⊡</button>
+    </div>
+  </div>
+
+  <!-- PROPERTIES PANEL -->
+  <div class="props-panel">
+    <div class="pp-section">
+      <div class="pp-title">Properties</div>
+      <div id="propsContent">
+        <div class="pp-empty">Select a node to view and edit its properties</div>
+      </div>
+    </div>
+    <div class="pp-section">
+      <div class="pp-title">Flow Statistics</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-val" style="color:var(--acc)" id="statNodes">0</div><div class="stat-lbl">Nodes</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--cyan)" id="statConns">0</div><div class="stat-lbl">Connections</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--pink)" id="statConds">0</div><div class="stat-lbl">Conditions</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--teal)" id="statOutputs">0</div><div class="stat-lbl">Outputs</div></div>
+      </div>
+    </div>
+    <div class="pp-section">
+      <div class="pp-title">Validation</div>
+      <div id="validationResults" style="font-size:0.65rem;line-height:1.6;color:var(--t2)">
+        Click "Validate" to check your flow
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>EXPORT WORKFLOW</h3>
+      <button class="modal-close" onclick="closeExport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="export-tabs">
+        <button class="export-tab active" onclick="switchExport('json',this)">JSON</button>
+        <button class="export-tab" onclick="switchExport('pseudocode',this)">Pseudocode</button>
+        <button class="export-tab" onclick="switchExport('mermaid',this)">Mermaid</button>
+        <button class="export-tab" onclick="switchExport('power',this)">Power Automate</button>
+      </div>
+      <pre id="exportContent"></pre>
+      <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+        <button class="tb-btn primary" onclick="copyExport()">Copy to Clipboard</button>
+        <button class="tb-btn" onclick="downloadExport()">Download</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+let nodes = [];
+let connections = [];
+let selectedNode = null;
+let nextId = 1;
+let zoom = 1;
+let panX = 0, panY = 0;
+let isPanning = false, panStartX = 0, panStartY = 0;
+let isDraggingNode = false, dragNode = null, dragOffX = 0, dragOffY = 0;
+let isConnecting = false, connFromNode = null, connFromPort = null, connMouseX = 0, connMouseY = 0;
+let undoStack = [], redoStack = [];
+let currentExportType = 'json';
+
+const canvas = document.getElementById('flowCanvas');
+const ctx = canvas.getContext('2d');
+const canvasArea = document.getElementById('canvasArea');
+const nodesContainer = document.getElementById('nodesContainer');
+
+const nodeDefaults = {
+  trigger: { schedule:{icon:'⏰',title:'Schedule Trigger',config:{cron:'0 * * * *',timezone:'EST'}},webhook:{icon:'🔗',title:'Webhook Trigger',config:{method:'POST',path:'/webhook'}},event:{icon:'⚡',title:'Event Trigger',config:{source:'system',event:'file.created'}},manual:{icon:'👤',title:'Manual Trigger',config:{label:'Run Now'}}},
+  action: { http:{icon:'🌐',title:'HTTP Request',config:{method:'GET',url:'https://api.example.com',headers:'{}'}},email:{icon:'📧',title:'Send Email',config:{to:'',subject:'',body:''}},teams:{icon:'💬',title:'Teams Message',config:{channel:'',message:''}},database:{icon:'🗄️',title:'Database Query',config:{type:'SQL',query:'SELECT * FROM ...'}},transform:{icon:'🔄',title:'Transform Data',config:{operation:'map',expression:''}},script:{icon:'📜',title:'Run Script',config:{language:'Python',code:''}}},
+  condition: { if:{icon:'🔀',title:'If / Else',config:{field:'',operator:'equals',value:''}},switch:{icon:'🔃',title:'Switch',config:{field:'',cases:''}}},
+  delay: { wait:{icon:'⏳',title:'Delay',config:{duration:5,unit:'seconds'}}},
+  loop: { foreach:{icon:'🔁',title:'For Each',config:{collection:'items',variable:'item'}}},
+  output: { log:{icon:'📋',title:'Log Output',config:{level:'info',message:''}},file:{icon:'💾',title:'Write File',config:{path:'',format:'json'}}}
+};
+
+// ============ CANVAS RESIZE ============
+function resizeCanvas() {
+  const rect = canvasArea.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  ctx.setTransform(2, 0, 0, 2, 0, 0);
+  drawConnections();
+}
+window.addEventListener('resize', resizeCanvas);
+setTimeout(resizeCanvas, 50);
+
+// ============ DRAW CONNECTIONS ============
+function drawConnections() {
+  const rect = canvasArea.getBoundingClientRect();
+  ctx.clearRect(0, 0, rect.width, rect.height);
+
+  // Draw grid
+  ctx.save();
+  ctx.translate(panX, panY);
+  ctx.scale(zoom, zoom);
+  const gridSize = 30;
+  const startX = Math.floor(-panX / zoom / gridSize) * gridSize - gridSize;
+  const startY = Math.floor(-panY / zoom / gridSize) * gridSize - gridSize;
+  const endX = startX + rect.width / zoom + gridSize * 2;
+  const endY = startY + rect.height / zoom + gridSize * 2;
+  ctx.fillStyle = 'rgba(108,92,231,0.03)';
+  for (let x = startX; x < endX; x += gridSize) {
+    for (let y = startY; y < endY; y += gridSize) {
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  // Draw connections
+  connections.forEach(conn => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode = nodes.find(n => n.id === conn.to);
+    if (!fromNode || !toNode) return;
+
+    const fromEl = document.getElementById(`node-${fromNode.id}`);
+    const toEl = document.getElementById(`node-${toNode.id}`);
+    if (!fromEl || !toEl) return;
+
+    let fromX, fromY;
+    if (conn.fromPort === 'yes') {
+      fromX = fromNode.x + fromEl.offsetWidth;
+      fromY = fromNode.y + fromEl.offsetHeight * 0.35;
+    } else if (conn.fromPort === 'no') {
+      fromX = fromNode.x + fromEl.offsetWidth;
+      fromY = fromNode.y + fromEl.offsetHeight * 0.65;
+    } else {
+      fromX = fromNode.x + fromEl.offsetWidth;
+      fromY = fromNode.y + fromEl.offsetHeight / 2;
+    }
+
+    const toX = toNode.x;
+    const toY = toNode.y + toEl.offsetHeight / 2;
+
+    const colors = {
+      trigger: '#6c5ce7', action: '#00cec9', condition: '#fd79a8',
+      delay: '#e17055', output: '#55efc4', loop: '#a29bfe'
+    };
+    let color = colors[fromNode.type] || '#6c5ce7';
+    if (conn.fromPort === 'yes') color = '#55efc4';
+    if (conn.fromPort === 'no') color = '#fd79a8';
+
+    const cpX = Math.abs(toX - fromX) * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.bezierCurveTo(fromX + cpX, fromY, toX - cpX, toY, toX, toY);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.6;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Arrowhead
+    const angle = Math.atan2(toY - (toY - cpX * 0.1), toX - (toX - cpX));
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - 8, toY - 4);
+    ctx.lineTo(toX - 8, toY + 4);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.6;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  // Draw active connection
+  if (isConnecting && connFromNode) {
+    const fromEl = document.getElementById(`node-${connFromNode.id}`);
+    if (fromEl) {
+      let fromX, fromY;
+      if (connFromPort === 'yes') {
+        fromX = connFromNode.x + fromEl.offsetWidth;
+        fromY = connFromNode.y + fromEl.offsetHeight * 0.35;
+      } else if (connFromPort === 'no') {
+        fromX = connFromNode.x + fromEl.offsetWidth;
+        fromY = connFromNode.y + fromEl.offsetHeight * 0.65;
+      } else {
+        fromX = connFromNode.x + fromEl.offsetWidth;
+        fromY = connFromNode.y + fromEl.offsetHeight / 2;
+      }
+      const toX = (connMouseX - panX) / zoom;
+      const toY = (connMouseY - panY) / zoom;
+      const cpX = Math.abs(toX - fromX) * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.bezierCurveTo(fromX + cpX, fromY, toX - cpX, toY, toX, toY);
+      ctx.strokeStyle = 'rgba(108,92,231,0.5)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  ctx.restore();
+}
+
+// ============ NODE CREATION ============
+function createNode(type, subtype, x, y) {
+  const def = nodeDefaults[type]?.[subtype];
+  if (!def) return;
+  saveUndo();
+  const node = {
+    id: nextId++,
+    type, subtype,
+    icon: def.icon,
+    title: def.title,
+    config: { ...def.config },
+    x: x || 100 + Math.random() * 200,
+    y: y || 100 + Math.random() * 200
+  };
+  nodes.push(node);
+  renderNode(node);
+  updateStats();
+  updateHint();
+  return node;
+}
+
+function renderNode(node) {
+  const existing = document.getElementById(`node-${node.id}`);
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.className = `flow-node fn-${node.type} ${selectedNode === node.id ? 'selected' : ''}`;
+  el.id = `node-${node.id}`;
+  el.style.left = (node.x * zoom + panX) + 'px';
+  el.style.top = (node.y * zoom + panY) + 'px';
+  el.style.transform = `scale(${zoom})`;
+  el.style.transformOrigin = 'top left';
+
+  const isCondition = node.type === 'condition';
+
+  el.innerHTML = `
+    <div class="fn-header">
+      <div class="fn-icon">${node.icon}</div>
+      <div class="fn-title">${node.title}</div>
+      <button class="fn-delete" onclick="event.stopPropagation();deleteNode(${node.id})">✕</button>
+    </div>
+    <div class="fn-body">
+      <div class="fn-config">${getConfigSummary(node)}</div>
+    </div>
+    ${node.type !== 'trigger' ? `<div class="fn-port port-in" data-node="${node.id}" data-port="in"></div>` : ''}
+    ${isCondition ? `
+      <div class="fn-port port-yes" data-node="${node.id}" data-port="yes"></div>
+      <div class="fn-port port-no" data-node="${node.id}" data-port="no"></div>
+      <div class="port-label label-yes">YES</div>
+      <div class="port-label label-no">NO</div>
+    ` : `
+      <div class="fn-port port-out" data-node="${node.id}" data-port="out"></div>
+    `}
+  `;
+
+  // Node click/select
+  el.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('fn-port') || e.target.classList.contains('fn-delete')) return;
+    e.stopPropagation();
+    selectNode(node.id);
+    isDraggingNode = true;
+    dragNode = node;
+    const rect = canvasArea.getBoundingClientRect();
+    dragOffX = e.clientX - rect.left - node.x * zoom - panX;
+    dragOffY = e.clientY - rect.top - node.y * zoom - panY;
+    el.classList.add('dragging');
+  });
+
+  // Port events
+  el.querySelectorAll('.fn-port').forEach(port => {
+    port.addEventListener('mousedown', e => {
+      e.stopPropagation();
+      const portType = port.dataset.port;
+      if (portType === 'in') return; // Can only drag FROM output ports
+      isConnecting = true;
+      connFromNode = node;
+      connFromPort = portType;
+    });
+    port.addEventListener('mouseup', e => {
+      e.stopPropagation();
+      const portType = port.dataset.port;
+      if (portType !== 'in') return;
+      if (isConnecting && connFromNode && connFromNode.id !== node.id) {
+        const exists = connections.some(c => c.from === connFromNode.id && c.to === node.id && c.fromPort === connFromPort);
+        if (!exists) {
+          saveUndo();
+          connections.push({ from: connFromNode.id, to: node.id, fromPort: connFromPort });
+          updateStats();
+        }
+      }
+      isConnecting = false;
+      connFromNode = null;
+      drawConnections();
+    });
+  });
+
+  nodesContainer.appendChild(el);
+}
+
+function getConfigSummary(node) {
+  const c = node.config;
+  switch (node.subtype) {
+    case 'schedule': return `Cron: ${c.cron} (${c.timezone})`;
+    case 'webhook': return `${c.method} ${c.path}`;
+    case 'event': return `${c.source}: ${c.event}`;
+    case 'manual': return c.label;
+    case 'http': return `${c.method} ${c.url || '(not set)'}`;
+    case 'email': return `To: ${c.to || '(not set)'}`;
+    case 'teams': return `Channel: ${c.channel || '(not set)'}`;
+    case 'database': return `${c.type}: ${c.query?.slice(0, 30) || '(not set)'}`;
+    case 'transform': return `Op: ${c.operation}`;
+    case 'script': return `${c.language}`;
+    case 'if': return `${c.field || '?'} ${c.operator} ${c.value || '?'}`;
+    case 'switch': return `Switch on: ${c.field || '(not set)'}`;
+    case 'wait': return `Wait ${c.duration} ${c.unit}`;
+    case 'foreach': return `For ${c.variable} in ${c.collection}`;
+    case 'log': return `[${c.level}] ${c.message?.slice(0, 25) || '(empty)'}`;
+    case 'file': return `${c.format} → ${c.path || '(not set)'}`;
+    default: return '';
+  }
+}
+
+function renderAllNodes() {
+  nodesContainer.innerHTML = '';
+  nodes.forEach(n => renderNode(n));
+  drawConnections();
+}
+
+// ============ NODE OPERATIONS ============
+function selectNode(id) {
+  selectedNode = id;
+  document.querySelectorAll('.flow-node').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById(`node-${id}`);
+  if (el) el.classList.add('selected');
+  showProperties(id);
+}
+
+function deleteNode(id) {
+  saveUndo();
+  nodes = nodes.filter(n => n.id !== id);
+  connections = connections.filter(c => c.from !== id && c.to !== id);
+  document.getElementById(`node-${id}`)?.remove();
+  if (selectedNode === id) { selectedNode = null; showProperties(null); }
+  updateStats();
+  drawConnections();
+  updateHint();
+}
+
+function clearCanvas() {
+  if (nodes.length === 0) return;
+  if (!confirm('Clear all nodes and connections?')) return;
+  saveUndo();
+  nodes = [];
+  connections = [];
+  selectedNode = null;
+  nodesContainer.innerHTML = '';
+  showProperties(null);
+  updateStats();
+  drawConnections();
+  updateHint();
+}
+
+// ============ PROPERTIES ============
+function showProperties(id) {
+  const el = document.getElementById('propsContent');
+  if (!id) { el.innerHTML = '<div class="pp-empty">Select a node to view and edit its properties</div>'; return; }
+  const node = nodes.find(n => n.id === id);
+  if (!node) return;
+
+  const colors = { trigger:'var(--acc)',action:'var(--cyan)',condition:'var(--pink)',delay:'var(--orange)',output:'var(--teal)',loop:'var(--acc2)' };
+
+  let configFields = '';
+  Object.entries(node.config).forEach(([key, val]) => {
+    const isLong = typeof val === 'string' && (key === 'body' || key === 'code' || key === 'query' || key === 'expression' || key === 'message');
+    if (key === 'operator') {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><select class="pp-select" onchange="updateConfig(${id},'${key}',this.value)">
+        ${['equals','not_equals','contains','greater_than','less_than','starts_with','ends_with','regex'].map(o => `<option value="${o}" ${val===o?'selected':''}>${o.replace(/_/g,' ')}</option>`).join('')}
+      </select></div>`;
+    } else if (key === 'method') {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><select class="pp-select" onchange="updateConfig(${id},'${key}',this.value)">
+        ${['GET','POST','PUT','PATCH','DELETE'].map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+      </select></div>`;
+    } else if (key === 'language') {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><select class="pp-select" onchange="updateConfig(${id},'${key}',this.value)">
+        ${['Python','PowerShell','JavaScript','Bash'].map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+      </select></div>`;
+    } else if (key === 'level') {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><select class="pp-select" onchange="updateConfig(${id},'${key}',this.value)">
+        ${['debug','info','warn','error','critical'].map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+      </select></div>`;
+    } else if (key === 'unit') {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><select class="pp-select" onchange="updateConfig(${id},'${key}',this.value)">
+        ${['seconds','minutes','hours','days'].map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')}
+      </select></div>`;
+    } else if (isLong) {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><textarea class="pp-textarea" onchange="updateConfig(${id},'${key}',this.value)">${val}</textarea></div>`;
+    } else if (typeof val === 'number') {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><input class="pp-input" type="number" value="${val}" onchange="updateConfig(${id},'${key}',Number(this.value))"></div>`;
+    } else {
+      configFields += `<div class="pp-field"><label class="pp-label">${key}</label><input class="pp-input" type="text" value="${val}" onchange="updateConfig(${id},'${key}',this.value)"></div>`;
+    }
+  });
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+      <span style="font-size:1.2rem">${node.icon}</span>
+      <div>
+        <div style="font-weight:600;font-size:0.8rem">${node.title}</div>
+        <span class="pp-badge" style="background:${colors[node.type]}22;color:${colors[node.type]};border:1px solid ${colors[node.type]}44">${node.type}</span>
+      </div>
+    </div>
+    <div class="pp-field">
+      <label class="pp-label">Display Name</label>
+      <input class="pp-input" type="text" value="${node.title}" onchange="updateTitle(${id},this.value)">
+    </div>
+    ${configFields}
+    <div style="margin-top:0.5rem;font-size:0.55rem;color:var(--t3)">ID: ${node.id} · Type: ${node.type}/${node.subtype}</div>
+  `;
+}
+
+function updateConfig(id, key, val) {
+  const node = nodes.find(n => n.id === id);
+  if (node) { node.config[key] = val; renderNode(node); selectNode(id); }
+}
+
+function updateTitle(id, val) {
+  const node = nodes.find(n => n.id === id);
+  if (node) { node.title = val; renderNode(node); selectNode(id); }
+}
+
+// ============ DRAG & DROP FROM PALETTE ============
+document.querySelectorAll('.palette-item').forEach(item => {
+  item.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({ type: item.dataset.type, subtype: item.dataset.subtype }));
+  });
+});
+
+canvasArea.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+canvasArea.addEventListener('drop', e => {
+  e.preventDefault();
+  try {
+    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+    const rect = canvasArea.getBoundingClientRect();
+    const x = (e.clientX - rect.left - panX) / zoom;
+    const y = (e.clientY - rect.top - panY) / zoom;
+    const node = createNode(data.type, data.subtype, x, y);
+    if (node) selectNode(node.id);
+  } catch {}
+});
+
+// ============ CANVAS MOUSE EVENTS ============
+canvasArea.addEventListener('mousedown', e => {
+  if (e.target === canvasArea || e.target === canvas) {
+    isPanning = true;
+    panStartX = e.clientX - panX;
+    panStartY = e.clientY - panY;
+    canvasArea.classList.add('grabbing');
+    if (selectedNode) { selectedNode = null; showProperties(null); document.querySelectorAll('.flow-node').forEach(el => el.classList.remove('selected')); }
+  }
+});
+
+window.addEventListener('mousemove', e => {
+  if (isPanning) {
+    panX = e.clientX - panStartX;
+    panY = e.clientY - panStartY;
+    renderAllNodes();
+  }
+  if (isDraggingNode && dragNode) {
+    const rect = canvasArea.getBoundingClientRect();
+    dragNode.x = (e.clientX - rect.left - dragOffX - panX) / zoom;
+    dragNode.y = (e.clientY - rect.top - dragOffY - panY) / zoom;
+    const el = document.getElementById(`node-${dragNode.id}`);
+    if (el) {
+      el.style.left = (dragNode.x * zoom + panX) + 'px';
+      el.style.top = (dragNode.y * zoom + panY) + 'px';
+    }
+    drawConnections();
+  }
+  if (isConnecting) {
+    const rect = canvasArea.getBoundingClientRect();
+    connMouseX = e.clientX - rect.left;
+    connMouseY = e.clientY - rect.top;
+    drawConnections();
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (isPanning) { isPanning = false; canvasArea.classList.remove('grabbing'); }
+  if (isDraggingNode) {
+    isDraggingNode = false;
+    document.querySelectorAll('.flow-node').forEach(el => el.classList.remove('dragging'));
+    dragNode = null;
+    updateMinimap();
+  }
+  if (isConnecting) { isConnecting = false; connFromNode = null; drawConnections(); }
+});
+
+// ============ ZOOM ============
+canvasArea.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.05 : 0.05;
+  zoom = Math.max(0.3, Math.min(2, zoom + delta));
+  renderAllNodes();
+  updateZoomDisplay();
+}, { passive: false });
+
+function zoomIn() { zoom = Math.min(2, zoom + 0.1); renderAllNodes(); updateZoomDisplay(); }
+function zoomOut() { zoom = Math.max(0.3, zoom - 0.1); renderAllNodes(); updateZoomDisplay(); }
+function zoomReset() { zoom = 1; panX = 0; panY = 0; renderAllNodes(); updateZoomDisplay(); }
+function updateZoomDisplay() {
+  const pct = Math.round(zoom * 100) + '%';
+  document.getElementById('zoomLevel').textContent = pct;
+  document.getElementById('zoomLabel').textContent = pct;
+}
+
+// ============ UNDO/REDO ============
+function saveUndo() { undoStack.push(JSON.stringify({ nodes: nodes.map(n => ({...n, config: {...n.config}})), connections: [...connections] })); redoStack = []; if (undoStack.length > 50) undoStack.shift(); }
+function undo() { if (!undoStack.length) return; redoStack.push(JSON.stringify({ nodes, connections })); const state = JSON.parse(undoStack.pop()); nodes = state.nodes; connections = state.connections; selectedNode = null; showProperties(null); renderAllNodes(); updateStats(); updateHint(); }
+function redo() { if (!redoStack.length) return; undoStack.push(JSON.stringify({ nodes, connections })); const state = JSON.parse(redoStack.pop()); nodes = state.nodes; connections = state.connections; selectedNode = null; showProperties(null); renderAllNodes(); updateStats(); updateHint(); }
+
+// ============ AUTO LAYOUT ============
+function autoLayout() {
+  if (!nodes.length) return;
+  saveUndo();
+  // Simple left-to-right layout
+  const triggers = nodes.filter(n => n.type === 'trigger');
+  const others = nodes.filter(n => n.type !== 'trigger');
+  let x = 60, y = 60;
+  triggers.forEach((n, i) => { n.x = x; n.y = y + i * 120; });
+  x += 260;
+  // BFS from triggers
+  const placed = new Set(triggers.map(n => n.id));
+  let queue = [...triggers];
+  while (queue.length) {
+    const next = [];
+    let colY = 60;
+    queue.forEach(qn => {
+      const outConns = connections.filter(c => c.from === qn.id);
+      outConns.forEach(c => {
+        if (placed.has(c.to)) return;
+        const tn = nodes.find(n => n.id === c.to);
+        if (tn) { tn.x = x; tn.y = colY; colY += 120; placed.add(tn.id); next.push(tn); }
+      });
+    });
+    x += 260;
+    queue = next;
+  }
+  // Place unconnected nodes
+  others.filter(n => !placed.has(n.id)).forEach((n, i) => { n.x = x; n.y = 60 + i * 120; });
+  renderAllNodes();
+  updateMinimap();
+}
+
+// ============ VALIDATE ============
+function validateFlow() {
+  const el = document.getElementById('validationResults');
+  const issues = [];
+  const triggers = nodes.filter(n => n.type === 'trigger');
+  if (triggers.length === 0) issues.push({ type: 'error', msg: 'No trigger node — flow has no entry point' });
+  if (triggers.length > 1) issues.push({ type: 'warn', msg: `${triggers.length} triggers found — consider single entry point` });
+  // Orphan check
+  nodes.forEach(n => {
+    if (n.type === 'trigger') return;
+    const hasInput = connections.some(c => c.to === n.id);
+    if (!hasInput) issues.push({ type: 'warn', msg: `"${n.title}" has no incoming connection` });
+  });
+  // Dead end check
+  nodes.forEach(n => {
+    if (n.type === 'output') return;
+    const hasOutput = connections.some(c => c.from === n.id);
+    if (!hasOutput) issues.push({ type: 'info', msg: `"${n.title}" has no outgoing connection (dead end)` });
+  });
+  // Config check
+  nodes.forEach(n => {
+    if (n.type === 'action' && n.subtype === 'http' && !n.config.url) issues.push({ type: 'warn', msg: `"${n.title}" missing URL` });
+    if (n.type === 'action' && n.subtype === 'email' && !n.config.to) issues.push({ type: 'warn', msg: `"${n.title}" missing recipient` });
+  });
+  if (issues.length === 0) issues.push({ type: 'success', msg: 'Flow validation passed — no issues found' });
+
+  const icons = { error: '🔴', warn: '🟡', info: '🔵', success: '🟢' };
+  el.innerHTML = issues.map(i => `<div style="padding:0.2rem 0">${icons[i.type]} ${i.msg}</div>`).join('');
+}
+
+// ============ EXPORT ============
+function openExport() { document.getElementById('exportModal').classList.add('open'); generateExport('json'); }
+function closeExport() { document.getElementById('exportModal').classList.remove('open'); }
+function switchExport(type, btn) {
+  currentExportType = type;
+  document.querySelectorAll('.export-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  generateExport(type);
+}
+
+function generateExport(type) {
+  const el = document.getElementById('exportContent');
+  if (type === 'json') {
+    el.textContent = JSON.stringify({ name: 'FLOWSTATE Workflow', version: '1.0', created: new Date().toISOString(), nodes: nodes.map(n => ({ id: n.id, type: n.type, subtype: n.subtype, title: n.title, config: n.config, position: { x: Math.round(n.x), y: Math.round(n.y) } })), connections: connections.map(c => ({ from: c.from, to: c.to, port: c.fromPort })) }, null, 2);
+  } else if (type === 'pseudocode') {
+    let code = '// FLOWSTATE Workflow — Pseudocode Export\n// Generated: ' + new Date().toISOString() + '\n\n';
+    const triggers = nodes.filter(n => n.type === 'trigger');
+    triggers.forEach(t => {
+      code += `ON ${t.subtype.toUpperCase()}(${Object.entries(t.config).map(([k,v]) => `${k}="${v}"`).join(', ')})\n`;
+      code += generatePseudoTree(t.id, 1);
+      code += 'END\n\n';
+    });
+    el.textContent = code;
+  } else if (type === 'mermaid') {
+    let mmd = 'graph LR\n';
+    nodes.forEach(n => {
+      const shape = n.type === 'condition' ? `{${n.title}}` : n.type === 'trigger' ? `([${n.title}])` : `[${n.title}]`;
+      mmd += `    N${n.id}${shape}\n`;
+    });
+    connections.forEach(c => {
+      const label = c.fromPort === 'yes' ? '|Yes|' : c.fromPort === 'no' ? '|No|' : '';
+      mmd += `    N${c.from} -->${label} N${c.to}\n`;
+    });
+    const styles = { trigger: '#6c5ce7', action: '#00cec9', condition: '#fd79a8', delay: '#e17055', output: '#55efc4', loop: '#a29bfe' };
+    nodes.forEach(n => { mmd += `    style N${n.id} fill:${styles[n.type]}22,stroke:${styles[n.type]},color:#fff\n`; });
+    el.textContent = mmd;
+  } else if (type === 'power') {
+    let pa = '// Power Automate-style Definition\n// This is a conceptual mapping — adapt for your connector\n\n';
+    pa += '{\n  "definition": {\n    "triggers": {\n';
+    const triggers = nodes.filter(n => n.type === 'trigger');
+    triggers.forEach((t, i) => {
+      pa += `      "${t.title.replace(/\s/g, '_')}": {\n        "type": "${t.subtype}",\n        "inputs": ${JSON.stringify(t.config, null, 8).split('\n').join('\n        ')}\n      }${i < triggers.length - 1 ? ',' : ''}\n`;
+    });
+    pa += '    },\n    "actions": {\n';
+    const actions = nodes.filter(n => n.type !== 'trigger');
+    actions.forEach((a, i) => {
+      pa += `      "${a.title.replace(/\s/g, '_')}": {\n        "type": "${a.type}/${a.subtype}",\n        "inputs": ${JSON.stringify(a.config, null, 8).split('\n').join('\n        ')},\n        "runAfter": [${connections.filter(c => c.to === a.id).map(c => `"${nodes.find(n => n.id === c.from)?.title || c.from}"`).join(', ')}]\n      }${i < actions.length - 1 ? ',' : ''}\n`;
+    });
+    pa += '    }\n  }\n}';
+    el.textContent = pa;
+  }
+}
+
+function generatePseudoTree(nodeId, depth) {
+  const indent = '  '.repeat(depth);
+  let code = '';
+  const outConns = connections.filter(c => c.from === nodeId);
+  outConns.forEach(conn => {
+    const target = nodes.find(n => n.id === conn.to);
+    if (!target) return;
+    if (target.type === 'condition') {
+      code += `${indent}IF ${target.config.field} ${target.config.operator} "${target.config.value}" THEN\n`;
+      const yesConns = connections.filter(c => c.from === target.id && c.fromPort === 'yes');
+      yesConns.forEach(yc => { const yt = nodes.find(n => n.id === yc.to); if (yt) { code += `${indent}  ${yt.type.toUpperCase()}: ${yt.title} (${getConfigSummary(yt)})\n`; code += generatePseudoTree(yt.id, depth + 2); } });
+      code += `${indent}ELSE\n`;
+      const noConns = connections.filter(c => c.from === target.id && c.fromPort === 'no');
+      noConns.forEach(nc => { const nt = nodes.find(n => n.id === nc.to); if (nt) { code += `${indent}  ${nt.type.toUpperCase()}: ${nt.title} (${getConfigSummary(nt)})\n`; code += generatePseudoTree(nt.id, depth + 2); } });
+      code += `${indent}END IF\n`;
+    } else if (target.type === 'loop') {
+      code += `${indent}FOR EACH ${target.config.variable} IN ${target.config.collection}\n`;
+      code += generatePseudoTree(target.id, depth + 1);
+      code += `${indent}END FOR\n`;
+    } else if (target.type === 'delay') {
+      code += `${indent}WAIT ${target.config.duration} ${target.config.unit}\n`;
+      code += generatePseudoTree(target.id, depth);
+    } else {
+      code += `${indent}${target.type.toUpperCase()}: ${target.title} (${getConfigSummary(target)})\n`;
+      code += generatePseudoTree(target.id, depth);
+    }
+  });
+  return code;
+}
+
+function copyExport() {
+  const text = document.getElementById('exportContent').textContent;
+  navigator.clipboard?.writeText(text).then(() => alert('Copied to clipboard'));
+}
+
+function downloadExport() {
+  const text = document.getElementById('exportContent').textContent;
+  const ext = { json: 'json', pseudocode: 'txt', mermaid: 'mmd', power: 'json' }[currentExportType];
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `flowstate-workflow.${ext}`;
+  a.click();
+}
+
+// ============ TEMPLATES ============
+function loadTemplate(name) {
+  saveUndo();
+  nodes = []; connections = []; nodesContainer.innerHTML = '';
+
+  if (name === 'onboarding') {
+    const t = createNode('trigger', 'event', 80, 120);
+    t.title = 'New Hire Event'; t.config = { source: 'HR System', event: 'employee.created' };
+    const a1 = createNode('action', 'http', 360, 40);
+    a1.title = 'Create AD Account'; a1.config = { method: 'POST', url: 'https://graph.microsoft.com/v1.0/users', headers: '{"Authorization":"Bearer ..."}' };
+    const a2 = createNode('action', 'email', 360, 180);
+    a2.title = 'Send Welcome Email'; a2.config = { to: '{{newHire.email}}', subject: 'Welcome to the team!', body: '' };
+    const a3 = createNode('action', 'teams', 640, 40);
+    a3.title = 'Add to Teams'; a3.config = { channel: '#onboarding', message: 'New team member: {{name}}' };
+    const a4 = createNode('output', 'log', 640, 180);
+    a4.title = 'Notify Manager'; a4.config = { level: 'info', message: 'Onboarding complete for {{name}}' };
+    connections.push({ from: t.id, to: a1.id, fromPort: 'out' }, { from: t.id, to: a2.id, fromPort: 'out' }, { from: a1.id, to: a3.id, fromPort: 'out' }, { from: a2.id, to: a4.id, fromPort: 'out' });
+  } else if (name === 'alerting') {
+    const t = createNode('trigger', 'webhook', 80, 150);
+    t.title = 'SIEM Webhook'; t.config = { method: 'POST', path: '/api/alerts' };
+    const c = createNode('condition', 'if', 360, 150);
+    c.title = 'Check Severity'; c.config = { field: 'severity', operator: 'greater_than', value: '7' };
+    const a1 = createNode('action', 'teams', 640, 60);
+    a1.title = 'Alert SOC Team'; a1.config = { channel: '#security-alerts', message: '🚨 HIGH: {{alert.title}}' };
+    const a2 = createNode('action', 'email', 640, 250);
+    a2.title = 'Email Summary'; a2.config = { to: 'soc@company.com', subject: 'Low-sev alert: {{title}}', body: '' };
+    const o = createNode('output', 'log', 920, 60);
+    o.title = 'Log Incident'; o.config = { level: 'warn', message: 'Incident logged: {{id}}' };
+    connections.push({ from: t.id, to: c.id, fromPort: 'out' }, { from: c.id, to: a1.id, fromPort: 'yes' }, { from: c.id, to: a2.id, fromPort: 'no' }, { from: a1.id, to: o.id, fromPort: 'out' });
+  } else if (name === 'backup') {
+    const t = createNode('trigger', 'schedule', 80, 120);
+    t.title = 'Daily 2AM Check'; t.config = { cron: '0 2 * * *', timezone: 'EST' };
+    const a1 = createNode('action', 'script', 360, 120);
+    a1.title = 'Check Backup Status'; a1.config = { language: 'PowerShell', code: 'Get-BackupJob -Last 24h' };
+    const c = createNode('condition', 'if', 640, 120);
+    c.title = 'Backup OK?'; c.config = { field: 'status', operator: 'equals', value: 'success' };
+    const o1 = createNode('output', 'log', 920, 40);
+    o1.title = 'Log Success'; o1.config = { level: 'info', message: 'Backup verified OK' };
+    const a2 = createNode('action', 'teams', 920, 200);
+    a2.title = 'Alert IT Team'; a2.config = { channel: '#it-ops', message: '⚠️ Backup FAILED — investigate' };
+    connections.push({ from: t.id, to: a1.id, fromPort: 'out' }, { from: a1.id, to: c.id, fromPort: 'out' }, { from: c.id, to: o1.id, fromPort: 'yes' }, { from: c.id, to: a2.id, fromPort: 'no' });
+  } else if (name === 'ticketing') {
+    const t = createNode('trigger', 'webhook', 80, 120);
+    t.title = 'Form Submission'; t.config = { method: 'POST', path: '/api/tickets' };
+    const a1 = createNode('action', 'transform', 340, 120);
+    a1.title = 'Categorize Ticket'; a1.config = { operation: 'map', expression: 'classify(description)' };
+    const a2 = createNode('action', 'database', 600, 120);
+    a2.title = 'Create Ticket'; a2.config = { type: 'SQL', query: "INSERT INTO tickets ..." };
+    const a3 = createNode('action', 'teams', 860, 50);
+    a3.title = 'Notify Assignee'; a3.config = { channel: '#helpdesk', message: 'New ticket: {{title}}' };
+    const o = createNode('output', 'log', 860, 200);
+    o.title = 'Track SLA'; o.config = { level: 'info', message: 'SLA clock started: {{id}}' };
+    connections.push({ from: t.id, to: a1.id, fromPort: 'out' }, { from: a1.id, to: a2.id, fromPort: 'out' }, { from: a2.id, to: a3.id, fromPort: 'out' }, { from: a2.id, to: o.id, fromPort: 'out' });
+  }
+
+  renderAllNodes();
+  updateStats();
+  updateHint();
+  updateMinimap();
+}
+
+// ============ SAVE / LOAD ============
+function saveFlow() {
+  const data = JSON.stringify({ nodes, connections, nextId, panX, panY, zoom });
+  localStorage.setItem('flowstate_save', data);
+  alert('Flow saved to browser storage');
+}
+
+function loadFlow() {
+  const data = localStorage.getItem('flowstate_save');
+  if (!data) { alert('No saved flow found'); return; }
+  try {
+    const state = JSON.parse(data);
+    nodes = state.nodes; connections = state.connections; nextId = state.nextId || nodes.length + 1;
+    panX = state.panX || 0; panY = state.panY || 0; zoom = state.zoom || 1;
+    selectedNode = null; showProperties(null);
+    renderAllNodes(); updateStats(); updateHint(); updateZoomDisplay(); updateMinimap();
+  } catch { alert('Error loading saved flow'); }
+}
+
+// ============ UTILS ============
+function updateStats() {
+  const nc = nodes.length, cc = connections.length;
+  const conds = nodes.filter(n => n.type === 'condition').length;
+  const outs = nodes.filter(n => n.type === 'output').length;
+  document.getElementById('nodeCount').textContent = `Nodes: ${nc}`;
+  document.getElementById('connCount').textContent = `Connections: ${cc}`;
+  document.getElementById('statNodes').textContent = nc;
+  document.getElementById('statConns').textContent = cc;
+  document.getElementById('statConds').textContent = conds;
+  document.getElementById('statOutputs').textContent = outs;
+  updateMinimap();
+}
+
+function updateHint() {
+  const hint = document.getElementById('canvasHint');
+  if (nodes.length > 0) hint.classList.add('hidden');
+  else hint.classList.remove('hidden');
+}
+
+function updateMinimap() {
+  const mm = document.getElementById('minimap');
+  mm.innerHTML = '';
+  if (!nodes.length) return;
+  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+  const minX = Math.min(...xs) - 50, minY = Math.min(...ys) - 50;
+  const maxX = Math.max(...xs) + 250, maxY = Math.max(...ys) + 150;
+  const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
+  const mmW = mm.offsetWidth, mmH = mm.offsetHeight;
+  const colors = { trigger: '#6c5ce7', action: '#00cec9', condition: '#fd79a8', delay: '#e17055', output: '#55efc4', loop: '#a29bfe' };
+  nodes.forEach(n => {
+    const dot = document.createElement('div');
+    dot.className = 'mm-node';
+    dot.style.left = ((n.x - minX) / rangeX * mmW) + 'px';
+    dot.style.top = ((n.y - minY) / rangeY * mmH) + 'px';
+    dot.style.width = '8px'; dot.style.height = '6px';
+    dot.style.background = colors[n.type] || '#6c5ce7';
+    mm.appendChild(dot);
+  });
+}
+
+// ============ KEYBOARD ============
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedNode) deleteNode(selectedNode); }
+  if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+  if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+  if (e.key === 'Escape') closeExport();
+});
+
+// ============ INIT ============
+resizeCanvas();
+</script>
+</body>
+</html>
